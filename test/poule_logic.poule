@@ -1,0 +1,67 @@
+(* Une preuve par règle de Poule : toutes doivent être acceptées. *)
+
+pred p : ()
+pred q : ()
+pred r : ()
+
+(* ∧ : paire, fst, snd *)
+theorem and_comm : p() /\ q() -> q() /\ p() =
+  fun (h : p() /\ q()) => (snd h, fst h)
+
+(* ∨ : left, right, match *)
+theorem or_comm : p() \/ q() -> q() \/ p() =
+  fun (h : p() \/ q()) =>
+    match h with
+    | left a => right q() a
+    | right b => left b : p()
+
+(* → : fun et application *)
+theorem trans : (p() -> q()) -> (q() -> r()) -> p() -> r() =
+  fun (f : p() -> q()) => fun (g : q() -> r()) => fun (x : p()) => g (f x)
+
+theorem curry : (p() /\ q() -> r()) -> p() -> q() -> r() =
+  fun (f : p() /\ q() -> r()) => fun (a : p()) => fun (b : q()) => f (a, b)
+
+(* Top, Bottom *)
+theorem top : Top = triv
+theorem ex_falso : Bottom -> p() = fun (h : Bottom) => abort h : p()
+
+(* un théorème déjà prouvé s'utilise comme un axiome *)
+theorem reuse : p() /\ q() -> q() /\ p() = and_comm
+
+(* Premier ordre : types, constructeurs, fonctions, ∀ et ∃ *)
+type Nat = Zero | Succ of Nat
+type 'a List = Nil | Cons of 'a * List('a)
+
+fundecl zero : () -> Nat
+fundecl length : (List('a)) -> Nat
+pred even : (Nat)
+pred le : (Nat, Nat)
+
+axiom even_zero : even(Zero)
+axiom even_ss : forall (n : Nat). even(n) -> even(Succ(Succ(n)))
+
+(* instanciation [t] *)
+theorem even_two : even(Succ(Succ(Zero))) = even_ss [Zero] even_zero
+theorem even_four : even(Succ(Succ(Succ(Succ(Zero))))) = even_ss [Succ(Succ(Zero))] even_two
+
+(* gen, à α-renommage près (k au lieu de n) *)
+theorem even_ss' : forall (n : Nat). even(n) -> even(Succ(Succ(n))) =
+  gen (k : Nat) => fun (h : even(k)) => even_ss [k] h
+
+(* ∃ : pack et unpack *)
+theorem some_even : exists (n : Nat). even(n) = pack [Nat, Zero, even_zero]
+
+theorem shift : (exists (n : Nat). even(n)) -> exists (m : Nat). even(Succ(Succ(m))) =
+  fun (h : exists (n : Nat). even(n)) => unpack (h, k, hk, pack [Nat, k, even_ss [k] hk])
+
+(* constante (fundecl sans argument) et type polymorphe *)
+theorem const : even(zero) -> even(zero) = fun (h : even(zero)) => h
+theorem poly : forall (l : List(Nat)). le(length(l), length(Cons(Zero, l))) -> le(length(l), length(Cons(Zero, l))) =
+  gen (l : List(Nat)) => fun (h : le(length(l), length(Cons(Zero, l)))) => h
+
+(* instanciation sous un lieur homonyme : le y lié est renommé, pas capturé *)
+theorem no_capture : (forall (x : Nat). exists (y : Nat). le(x, y)) -> forall (y : Nat). exists (z : Nat). le(y, z) =
+  fun (h : forall (x : Nat). exists (y : Nat). le(x, y)) => gen (y : Nat) => h [y]
+
+check fun (x : even(Zero) /\ even(Zero)) => fst x : even(Zero) /\ even(Zero) -> even(Zero)

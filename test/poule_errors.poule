@@ -1,0 +1,41 @@
+(* Chaque théorème est faux ou mal formé : le vérificateur doit tous les rejeter
+   (sauf le dernier), sans s'arrêter au premier. *)
+
+type Nat = Zero | Succ of Nat
+type 'a List = Nil | Cons of 'a * List('a)
+pred p : ()
+pred q : ()
+pred r : ()
+pred even : (Nat)
+pred le : (Nat, Nat)
+axiom ap : p()
+axiom ez : even(Zero)
+
+(* la preuve prouve autre chose que l'énoncé *)
+theorem wrong : even(Zero) /\ even(Zero) = ez
+
+(* hypothèse inconnue *)
+theorem unknown : p() = nothere
+
+(* variable propre : n est libre dans l'hypothèse h, le second gen est illégal *)
+theorem not_fresh : forall (n : Nat). even(n) -> forall (m : Nat). even(m) =
+  gen (n : Nat) => fun (h : even(n)) => gen (n : Nat) => h
+
+(* formule mal typée, mauvaise arité, variable de terme non liée *)
+theorem ill_typed : even(Nil) = triv
+theorem arity : even(Zero, Zero) = triv
+theorem unbound : even(x) = triv
+
+(* annotation de left qui ne correspond pas au but *)
+theorem bad_left : p() \/ q() = left ap : r()
+
+(* fst sur autre chose qu'une conjonction *)
+theorem bad_fst : p() = fst ap
+
+(* substitution sans capture : h [y] doit renommer le y lié, sinon on
+   « prouverait » exists z. le(z, z) *)
+theorem capture : (forall (x : Nat). exists (y : Nat). le(x, y)) -> forall (y : Nat). exists (z : Nat). le(z, z) =
+  fun (h : forall (x : Nat). exists (y : Nat). le(x, y)) => gen (y : Nat) => h [y]
+
+(* celui-ci est juste : le vérificateur continue après les erreurs *)
+theorem fine : p() \/ q() = left ap : q()
