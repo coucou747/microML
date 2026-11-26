@@ -43,9 +43,29 @@ end = struct
   let ppty f ty = Ty.Fixed.pp F.pp BT.pp BTyNamed.pp f ty
 
   let ftv_ty ty = Ty.Fixed.Deep.foldfg Aux.passacc (BT.Set.add) Aux.passacc ty BT.Set.empty
-  let ftv_env env = B.Map.fold (fun _binding scheme acc -> BT.Set.union acc (BT.Set.of_list scheme.vars) ) env.bindings BT.Set.empty
+
+  (* Applique la substitution [tybindings] récursivement : une chaîne
+     'b := 'a, 'a := int doit donner int pour 'b, pas 'a. *)
+  let rec resolve env ty =
+    Ty.Fixed.Deep.map
+      (function
+       | Ty.Var binding as v ->
+          begin match BT.Map.find_opt binding env.tybindings with
+          | None -> v
+          | Some s -> Ty.Fixed.unfix (resolve env s)
+          end
+       | x -> x)
+      ty
+
+  (* Variables libres de l'environnement : celles des corps de schémas (une fois la
+     substitution appliquée), moins les variables quantifiées. *)
+  let ftv_env env =
+    B.Map.fold (fun _binding scheme acc ->
+        BT.Set.union acc (BT.Set.diff (ftv_ty (resolve env scheme.body)) (BT.Set.of_list scheme.vars)))
+      env.bindings BT.Set.empty
 
   let generalize env ty =
+    let ty = resolve env ty in
     let vars = BT.Set.diff (ftv_ty ty) (ftv_env env) in
     {vars=BT.Set.to_list vars; body=ty}
 
@@ -82,7 +102,8 @@ end = struct
     { env with bindings = B.Map.add binding {vars=[]; body=ty} env.bindings}
 
   let insert_poly env binding ty =
-    let scheme = generalize env ty in
+    (* la liaison elle-même (monomorphe pendant un let rec) ne doit pas bloquer la généralisation *)
+    let scheme = generalize { env with bindings = B.Map.remove binding env.bindings } ty in
     { env with bindings = B.Map.add binding scheme env.bindings}
 
   let find_binding env binding =
@@ -112,14 +133,18 @@ end = struct
        in env, Ty.Named(li, d1)
     | Ty.Var v1, Ty.Var v2 when BT.equal v1 v2 ->
        env, t1
-    | Ty.Var v, t | t, Ty.Var v -> (* TODO interdire un type récursif *)
-       occurs_check v t location;
-       let env, t = match BT.Map.find_opt v env.tybindings with
-       | None -> env, t
-       | Some t2 -> unify location env t (Ty.Fixed.unfix t2)
-       in
-       let env = {env with tybindings = BT.Map.add v (tf location t) env.tybindings } in
-       env, t
+    | Ty.Var v, t | t, Ty.Var v ->
+       begin match BT.Map.find_opt v env.tybindings with
+       | Some tv -> unify location env (Ty.Fixed.unfix tv) t
+       | None ->
+          let t = Ty.Fixed.unfix (resolve env (tf location t)) in
+          match t with
+          | Ty.Var w when BT.equal v w -> env, t
+          | _ ->
+             occurs_check v t location;
+             let env = {env with tybindings = BT.Map.add v (tf location t) env.tybindings } in
+             env, t
+       end
     | Ty.Integer, Ty.Integer -> env, Ty.Integer
     | Ty.Char, Ty.Char -> env, Ty.Char
     | Ty.Bool, Ty.Bool -> env, Ty.Bool
@@ -207,16 +232,7 @@ end = struct
 
   let ty_pattern pat env = Fixed.Deep.decorate_foldmap_u ty_pattern pat env
 
-  let apply_ty env ty = (* On applique la map de substitution *)
-    Ty.Fixed.Deep.map
-      (function
-       | Var binding ->
-          begin match BT.Map.find_opt binding env.tybindings with
-          | None -> Var binding
-          | Some s -> Ty.Fixed.unfix s (* TODO récursif ? *)
-          end
-      | x -> x )
-      ty
+  let apply_ty = resolve
 
   let ty_expr location tra expr env =
     let ef x = location, tf location x in
@@ -247,10 +263,11 @@ end = struct
                    env, ef (Ty.Named(nvars, s)), Fixable.Construct (a, e)
        end
     | Fixable.Lambda (c, a) ->
+       let outer = env.bindings in
        let env, tc = fresh location env c in
-       let env = insert_mono env c tc in
        let env, a = tra env a in
        let ta = ty_of_expr a in
+       let env = { env with bindings = outer } in (* c sort de la portée *)
        env, Ty.Arrow (tc, ta)|> ef, Fixable.Lambda (c, a)
     | Fixable.BinOp (a, op, b) ->
        let t0, t_out = match op with
@@ -295,9 +312,10 @@ end = struct
        let env, a = tra env a in
        let ta = ty_of_expr a in
        let env, li = List.fold_left_map (fun env (pat, e) ->
+                         let outer = env.bindings in
                          let env, p = ty_pattern pat env in
                          let env, e = tra env e in
-                         env, (p, e)) env li in
+                         { env with bindings = outer }, (p, e)) env li in
        let patterns, expressions = List.split li in
        let env, ty_sum = merge_patterns location env (List.map ty_of_pat patterns) in
        let env, tout = match expressions with
@@ -325,20 +343,25 @@ end = struct
        let env, _ta = unify location env ta (tf location Ty.Bool) in
        env, (location, tb), Fixable.IfThenElse(a, b, c)
     | Fixable.LetIn (c, a, b) ->
+       let outer = env.bindings in
        let env, a = tra env a in
        let ta = ty_of_expr a in
        let env = insert_poly env c ta in
        let env, b = tra env b in
        let tb = ty_of_expr b in
+       let env = { env with bindings = outer } in
        env, (location, tb), Fixable.LetIn(c, a, b)
     | Fixable.LetRecIn(c, a, b) ->
+       let outer = env.bindings in
        let env, tc = fresh' location env in
        let env = insert_mono env c tc in
        let env, a = tra env a in
        let ta = ty_of_expr a in
        let env, _ta = unify location env ta tc in
+       let env = insert_poly env c tc in (* c est polymorphe dans le corps *)
        let env, b = tra env b in
        let tb = ty_of_expr b in
+       let env = { env with bindings = outer } in
        env, (location, tb), Fixable.LetRecIn(c, a, b)
     | Fixable.Var c ->
        let env, tc = find_binding env c in

@@ -4,10 +4,8 @@
    ../runtime/libruntime.a
    ../bin/main.exe
    ../bin/poule.exe
-   t01.ml t02.ml t03.ml t04.ml t05.ml t06.ml
-   t_polymorphisme.ml t_tuple.ml t_construct.ml t_constructtuple.ml
-   t_notype0.ml t_notype1.ml t_notype2.ml t_notype3.ml t_notype4.ml t_bindings.ml
-   t_lazy.ml t_lazy1.ml
+   (glob_files *.ml)
+   (glob_files *.poule)
    ))
 
 (test
