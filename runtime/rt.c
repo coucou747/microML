@@ -4,8 +4,14 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define STEP_SIZE 1024 * 1024
-#define INIT_SIZE STEP_SIZE * 128
+#define STEP_SIZE (1024 * 1024)
+/* Taille du tas en cellules MLV (128 Mi cellules = 4 Gio en 64 bits).
+   Surchargeable à la compilation : -DINIT_SIZE=... */
+#ifndef INIT_SIZE
+#define INIT_SIZE (STEP_SIZE * 128)
+#endif
+/* En dessous, on abandonne plutôt que de réessayer. */
+#define MIN_HEAP_SIZE STEP_SIZE
 
 struct MLV *memory = NULL;
 struct MLV *memory_ptr = NULL;
@@ -16,9 +22,19 @@ struct MLV True = {1, NULL, 0, NULL};
 
 struct MLV *alloc(int i){
   if (memory == NULL){
-    memory = malloc(INIT_SIZE * sizeof(struct MLV));
+    /* Linux refuse un malloc plus grand que RAM + swap (ex. 4 Gio sur une machine
+       de 2 Gio) : on divise la taille par deux jusqu'à ce que ça passe. */
+    size_t size = INIT_SIZE;
+    while (memory == NULL && size >= MIN_HEAP_SIZE){
+      memory = malloc(size * sizeof(struct MLV));
+      if (memory == NULL) size /= 2;
+    }
+    if (memory == NULL){
+      fprintf(stderr, "Impossible d'allouer le tas.\n");
+      exit(1);
+    }
     memory_ptr = memory;
-    end_memory = memory + INIT_SIZE;
+    end_memory = memory + size;
   }
   if (end_memory < memory_ptr + i){
     // TODO réalloc
