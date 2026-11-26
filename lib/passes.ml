@@ -6,20 +6,20 @@ type ('acc, 'from, 'target, 'prev, 'final ) t = {
 
 let nofinal = fun _ a -> a
 
-let print_pass pp = {init = (); final = nofinal; process = fun () value -> Format.printf "%a@\n" pp value; (), value;}
+(* le saut de ligne final est ajouté par handle_option, hors de la boîte *)
+let print_pass pp = {init = (); final = nofinal; process = fun () value -> Format.printf "%a" pp value; (), value;}
 
 let no_pass = {init = (); final = nofinal; process = fun () value -> (), value}
 
 let handle_option name access pass =
   if access name then
-    let len = String.length name in
     { init = pass.init; final = pass.final;
       process = fun acc v ->
-                Format.printf "%s@[" name;
-                Format.pp_open_vbox Format.std_formatter 0;
-                Format.pp_set_margin Format.std_formatter (Format.pp_get_margin Format.std_formatter () - len);
+                (* une seule boîte, ouverte après le nom de la passe et refermée après
+                   l'élément : l'indentation suit le nom sans toucher à la marge *)
+                Format.printf "%s@[<v>" name;
                 let out = pass.process acc v in
-                Format.pp_close_box Format.std_formatter ();
+                Format.printf "@]@\n@?";
                 out}
   else no_pass
 
