@@ -30,13 +30,19 @@ struct MLV int_add(struct MLV a, struct MLV b);
 struct MLV int_sub(struct MLV a, struct MLV b);
 struct MLV int_mul(struct MLV a, struct MLV b);
 struct MLV int_div(struct MLV a, struct MLV b);
+struct MLV int_lt(struct MLV a, struct MLV b);
+struct MLV int_le(struct MLV a, struct MLV b);
+struct MLV int_gt(struct MLV a, struct MLV b);
+struct MLV int_ge(struct MLV a, struct MLV b);
 
 
 struct MLV bool_or(struct MLV a, struct MLV b);
 struct MLV bool_and(struct MLV a, struct MLV b);
+struct MLV bool_not(struct MLV a);
 
 void runtime_init();
 extern MLV prim_print_int_clot;
 
 struct MLV mlv_eq(struct MLV a, struct MLV b);
+struct MLV mlv_neq(struct MLV a, struct MLV b);
 int to_bool(struct MLV a);

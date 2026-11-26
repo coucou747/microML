@@ -179,6 +179,26 @@ struct MLV int_div(struct MLV a, struct MLV b){
   return make_int(a.value / b.value);
 }
 
+struct MLV int_lt(struct MLV a, struct MLV b){
+  return make_bool(a.value < b.value);
+}
+
+struct MLV int_le(struct MLV a, struct MLV b){
+  return make_bool(a.value <= b.value);
+}
+
+struct MLV int_gt(struct MLV a, struct MLV b){
+  return make_bool(a.value > b.value);
+}
+
+struct MLV int_ge(struct MLV a, struct MLV b){
+  return make_bool(a.value >= b.value);
+}
+
+struct MLV mlv_neq(struct MLV a, struct MLV b){
+  return make_bool(!to_bool(mlv_eq(a, b)));
+}
+
 MLV prim_print_int(MLV m){
   printf("%d", m.ptr[0].value);
   return m;
@@ -195,4 +215,8 @@ struct MLV bool_or(struct MLV a, struct MLV b) {
 
 struct MLV bool_and(struct MLV a, struct MLV b){
   return make_bool(a.value && b.value);
+}
+
+struct MLV bool_not(struct MLV a){
+  return make_bool(!a.value);
 }
