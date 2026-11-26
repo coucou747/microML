@@ -71,3 +71,8 @@ une preuve fausse ou une formule mal formée est rejetée, avec sa position :
   9 proof(s) rejected
   
   [2]
+--trace : l'arbre de dérivation de chaque théorème, en JSON :
+  $ ../bin/poule.exe --trace test01.poule | grep -c '^TRACE {"theorem":"theorem id_and","ok":true'
+  1
+  $ ../bin/poule.exe --trace poule_errors.poule 2>/dev/null | grep -c '"ok":false'
+  9

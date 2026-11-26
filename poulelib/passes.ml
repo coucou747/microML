@@ -20,4 +20,4 @@ let parse_file filename =
 let pipeline options filename =
   parse_file filename
   |>~ (handle_option "parsing" options (print_pass Types.ParsedProg.pp)
-       ++> PassProof.passe)
+       ++> PassProof.passe ~trace:(options "trace"))

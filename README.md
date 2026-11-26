@@ -40,6 +40,8 @@ Ajout de l'option --debug <nom de la passe> pour pouvoir afficher un AST interm�
 ```
 dune exec -- bin/poule.exe test/poule_logic.poule
 ```
+`--trace` ajoute, pour chaque théorème, une ligne `TRACE {...}` : l'arbre de dérivation en JSON (règle, formule prouvée, position, hypothèses introduites).
+
 Chaque `theorem` / `check` affiche `OK` ou `FAILED` avec la raison et la position ; le code de sortie est non nul si une preuve est rejetée. Un théorème prouvé s'utilise ensuite comme un axiome.
 
 | preuve | prouve | à partir de |

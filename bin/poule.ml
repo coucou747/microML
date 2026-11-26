@@ -3,6 +3,7 @@ let file = ref None
 let debug = ref []
 let specs = [
     ("--debug", Arg.String (fun s -> debug := s::!debug), "add debug (args must be parsing, bindings, fields, eval or backend)");
+    ("--trace", Arg.Unit (fun () -> debug := "trace"::!debug), "print each checked derivation tree as a JSON line (TRACE {...})");
   ]
 let anon s = match !file with
   | None -> file := Some s
